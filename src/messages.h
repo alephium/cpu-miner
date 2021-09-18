@@ -1,3 +1,6 @@
+#ifndef ALEPHIUM_MESSAGE_H
+#define ALEPHIUM_MESSAGE_H
+
 #include <stdio.h>
 #include <stdint.h>
 #include <assert.h>
@@ -80,17 +83,18 @@ void free_job(job_t *job) {
     free_blob(&job->header_blob);
     free_blob(&job->txs_blob);
     free_blob(&job->target);
+    free(job);
 }
 
 typedef struct jobs_t {
-    job_t *jobs;
+    job_t **jobs;
     size_t len;
 } jobs_t;
 
 void free_jobs(jobs_t *jobs)
 {
     for (size_t i = 0; i < jobs->len; i++) {
-        free_job(&jobs->jobs[i]);
+        free_job(jobs->jobs[i]);
     }
     free(jobs->jobs);
 }
@@ -114,12 +118,11 @@ typedef struct server_message_t {
     };
 } server_message_t;
 
-void free_server_message(server_message_t *message)
+void free_server_message_except_jobs(server_message_t *message)
 {
     switch (message->kind)
     {
     case JOBS:
-        free_jobs(message->jobs);
         free(message->jobs);
         break;
 
@@ -129,14 +132,6 @@ void free_server_message(server_message_t *message)
     }
 
     free(message);
-}
-
-jobs_t *allocate_jobs(ssize_t size)
-{
-    jobs_t *jobs = (jobs_t *)malloc(sizeof(jobs_t));
-    jobs->len = size;
-    jobs->jobs = (job_t *)malloc(size * sizeof(job_t));
-    return jobs;
 }
 
 ssize_t decode_size(uint8_t *bytes)
@@ -181,7 +176,7 @@ void extract_blob(uint8_t **bytes, blob_t *blob)
     memcpy(blob->blob, *bytes, size);
     *bytes = *bytes + size;
 
-    printf("blob: %ld\n", blob->len);
+    // printf("blob: %ld\n", blob->len);
     // printf("%s\n", bytes_to_hex(blob->blob, blob->len));
 }
 
@@ -189,7 +184,7 @@ void extract_job(uint8_t **bytes, job_t *job)
 {
     job->from_group = extract_size(bytes);
     job->to_group = extract_size(bytes);
-    printf("group: %d, %d\n", job->from_group, job->to_group);
+    // printf("group: %d, %d\n", job->from_group, job->to_group);
     extract_blob(bytes, &job->header_blob);
     extract_blob(bytes, &job->txs_blob);
     extract_blob(bytes, &job->target);
@@ -199,12 +194,13 @@ void extract_jobs(uint8_t **bytes, jobs_t *jobs)
 {
     ssize_t jobs_size = extract_size(bytes);
 
-    printf("jobs: %ld\n", jobs_size);
+    // printf("jobs: %ld\n", jobs_size);
 
     jobs->len = jobs_size;
-    jobs->jobs = (job_t *)malloc(jobs_size * sizeof(job_t));
+    jobs->jobs = (job_t **)malloc(jobs_size * sizeof(job_t*));
     for(ssize_t i = 0; i < jobs_size; i++) {
-        extract_job(bytes, &(jobs->jobs[i]));
+        jobs->jobs[i] = (job_t *)malloc(sizeof(job_t));
+        extract_job(bytes, (jobs->jobs[i]));
     }
 }
 
@@ -231,7 +227,7 @@ server_message_t *decode_server_message(uint8_t *bytes, ssize_t len)
         server_message->jobs = (jobs_t *)malloc(sizeof(jobs_t));
         extract_jobs(&pos, server_message->jobs);
 
-        printf("%p, %p, %p\n", bytes, pos, bytes + len);
+        // printf("%p, %p, %p\n", bytes, pos, bytes + len);
         break;
 
     case 1:
@@ -253,3 +249,5 @@ server_message_t *decode_server_message_from_blob(blob_t *blob)
 {
     return decode_server_message(blob->blob, blob->len);
 }
+
+#endif // ALEPHIUM_MESSAGE_H

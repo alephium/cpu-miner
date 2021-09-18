@@ -79,7 +79,7 @@ CFLAGS := -O3 $(STD) $(STACK) $(WARNS)
 DEBUG := -g3 -DDEBUG=1
 
 # Dependency libraries
-LIBS := -luv # -lm  -I some/path/to/library
+LIBS := -luv -I BLAKE3/c # -lm  -I some/path/to/library
 
 # Test libraries
 TEST_LIBS := -l cmocka -L /usr/lib
@@ -95,6 +95,11 @@ TEST_BINARY := $(BINARY)_test_runner
 NAMES := $(notdir $(basename $(wildcard $(SRCDIR)/*.$(SRCEXT))))
 OBJECTS :=$(patsubst %,$(LIBDIR)/%.o,$(NAMES))
 
+
+BLAKE3_C_DIR := BLAKE3/c
+BLAKE3_C_Code := $(BLAKE3_C_DIR)/blake3.c $(BLAKE3_C_DIR)/blake3_dispatch.c $(BLAKE3_C_DIR)/blake3_portable.c \
+    $(BLAKE3_C_DIR)/blake3_sse2_x86-64_unix.S $(BLAKE3_C_DIR)/blake3_sse41_x86-64_unix.S $(BLAKE3_C_DIR)/blake3_avx2_x86-64_unix.S \
+    $(BLAKE3_C_DIR)/blake3_avx512_x86-64_unix.S
 
 #
 # COMPILATION RULES
@@ -126,10 +131,17 @@ start:
 	@echo "Happy hacking o/"
 
 
+lib/libblake3.a:
+	@echo "build blake3"
+	cd BLAKE3/c && gcc -shared -O3 -o libblake3.so blake3.c blake3_dispatch.c blake3_portable.c \
+    	blake3_sse2_x86-64_unix.S blake3_sse41_x86-64_unix.S blake3_avx2_x86-64_unix.S \
+    	blake3_avx512_x86-64_unix.S
+	mv BLAKE3/c/libblake3.so lib/libblake3.so
+
 # Rule for link and generate the binary file
 all: $(OBJECTS)
 	@echo -en "$(BROWN)LD $(END_COLOR)";
-	$(CC) -o $(BINDIR)/$(BINARY) $+ $(DEBUG) $(CFLAGS) $(LIBS)
+	$(CC) -o $(BINDIR)/$(BINARY) $+ $(DEBUG) $(CFLAGS) $(LIBS) $(BLAKE3_C_Code)
 	@echo -en "\n--\nBinary file placed at" \
 			  "$(BROWN)$(BINDIR)/$(BINARY)$(END_COLOR)\n";
 

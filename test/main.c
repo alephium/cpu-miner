@@ -4,6 +4,7 @@
 #include <cmocka.h>
 
 #include "messages.h"
+#include "pow.h"
 
 static void convert_hex(void **state)
 {
@@ -73,6 +74,43 @@ static void extract_submit_result_message_test(void **state)
     assert_int_equal(message->submit_result->status, true);
 }
 
+static void check_target_test(void **state)
+{
+    blob_t hash;
+    blob_t target;
+    hex_to_bytes("00000000aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", &hash);
+
+    hex_to_bytes("00000000aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", &target);
+    assert_int_equal(check_target(hash.blob, &target), true);
+
+    // remove 4 leading zeros
+    hex_to_bytes("0000aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", &target);
+    assert_int_equal(check_target(hash.blob, &target), true);
+
+    // remove all leading zeros
+    hex_to_bytes("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", &target);
+    assert_int_equal(check_target(hash.blob, &target), true);
+
+    // remove all leading zeros + "aa"
+    hex_to_bytes("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", &target);
+    assert_int_equal(check_target(hash.blob, &target), false);
+
+    // replace leading "aa" with "bb"
+    hex_to_bytes("bbaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", &target);
+    assert_int_equal(check_target(hash.blob, &target), true);
+
+    // replace the last "a" with "b"
+    hex_to_bytes("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab", &target);
+    assert_int_equal(check_target(hash.blob, &target), true);
+
+    // replace the last "a" with "9"
+    hex_to_bytes("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa9", &target);
+    assert_int_equal(check_target(hash.blob, &target), false);
+
+    hex_to_bytes("a9aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", &target);
+    assert_int_equal(check_target(hash.blob, &target), false);
+}
+
 int main(void) {
 
     const struct CMUnitTest tests[] = {
@@ -81,6 +119,7 @@ int main(void) {
         cmocka_unit_test(extract_blob_test),
         cmocka_unit_test(extract_jobs_test),
         cmocka_unit_test(extract_jobs_message_test),
+        cmocka_unit_test(check_target_test),
     };
 
 
