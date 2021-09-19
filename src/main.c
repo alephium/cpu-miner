@@ -91,6 +91,8 @@ void after_mine(uv_work_t *req, int status)
 	job_t *job = worker->template->job;
 	uint32_t chain_index = job->from_group * group_nums + job->to_group;
 	mining_counts[chain_index] += worker->hash_count - mining_steps;
+
+	free_template(worker->template);
 	continue_mine(worker);
 }
 

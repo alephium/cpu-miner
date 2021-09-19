@@ -70,6 +70,7 @@ ssize_t write_new_block(mining_worker_t *worker)
 void setup_template(mining_worker_t *worker, mining_template_t *template)
 {
 	worker->template = template;
+	template->ref_count += 1;
 }
 
 #endif // ALEPHIUM_WORKER_H
