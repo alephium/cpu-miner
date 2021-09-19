@@ -14,10 +14,10 @@
 #include "constants.h"
 
 typedef struct mining_template_t {
-	job_t *job;
+    job_t *job;
     uint32_t ref_count;
 
-	uint64_t chain_task_count; // increase this by one everytime the template for the chain is updated
+    uint64_t chain_task_count; // increase this by one everytime the template for the chain is updated
 } mining_template_t;
 
 void free_template(mining_template_t *template)
@@ -37,11 +37,11 @@ bool mining_templates_initialized = false;
 
 void update_templates(job_t *job)
 {
-	mining_template_t *new_template = malloc(sizeof(mining_template_t));
-	new_template->job = job;
+    mining_template_t *new_template = malloc(sizeof(mining_template_t));
+    new_template->job = job;
     new_template->ref_count = 1; // referred by mining_templates
 
-	ssize_t chain_index = job->from_group * group_nums + job->to_group;
+    ssize_t chain_index = job->from_group * group_nums + job->to_group;
     mining_template_t *last_template = mining_templates[chain_index];
     if (last_template) {
         new_template->chain_task_count = last_template->chain_task_count + 1;

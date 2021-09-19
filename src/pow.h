@@ -34,13 +34,13 @@ bool check_target(uint8_t *hash, blob_t *target)
 
 bool check_index(uint8_t *hash, uint32_t from_group, uint32_t to_group)
 {
-	uint8_t big_index = hash[31] % chain_nums;
-	return (big_index / group_nums == from_group) && (big_index % group_nums == to_group);
+    uint8_t big_index = hash[31] % chain_nums;
+    return (big_index / group_nums == from_group) && (big_index % group_nums == to_group);
 }
 
 bool check_hash(uint8_t *hash, blob_t *target, uint32_t from_group, uint32_t to_group)
 {
-	return check_target(hash, target) && check_index(hash, from_group, to_group);
+    return check_target(hash, target) && check_index(hash, from_group, to_group);
 }
 
 #endif // ALEPHIUM_POW_H
