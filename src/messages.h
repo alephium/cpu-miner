@@ -21,7 +21,7 @@ void free_blob(blob_t *blob)
 char *bytes_to_hex(uint8_t *bytes, ssize_t len)
 {
     ssize_t hex_len = 2 * len + 1;
-    char *hex_string = (char *)malloc(hex_len);
+    char *hex_string = malloc(hex_len);
     bzero(hex_string, hex_len);
 
     uint8_t *byte_cursor = bytes;
@@ -61,7 +61,7 @@ void hex_to_bytes(const char *hex_data, blob_t *buf)
     assert(hex_len % 2 == 0);
 
     buf->len = hex_len / 2;
-    buf->blob = (uint8_t *)malloc(buf->len);
+    buf->blob = malloc(buf->len);
     bzero(buf->blob, buf->len);
 
     for (size_t pos = 0; pos < hex_len; pos += 2) {
@@ -199,7 +199,7 @@ void extract_blob(uint8_t **bytes, blob_t *blob)
 {
     ssize_t size = extract_size(bytes);
     blob->len = size;
-    blob->blob = (uint8_t *)malloc(size * sizeof(uint8_t));
+    blob->blob = malloc(size * sizeof(uint8_t));
     memcpy(blob->blob, *bytes, size);
     *bytes = *bytes + size;
 
@@ -224,9 +224,9 @@ void extract_jobs(uint8_t **bytes, jobs_t *jobs)
     // printf("jobs: %ld\n", jobs_size);
 
     jobs->len = jobs_size;
-    jobs->jobs = (job_t **)malloc(jobs_size * sizeof(job_t*));
+    jobs->jobs = malloc(jobs_size * sizeof(job_t*));
     for(ssize_t i = 0; i < jobs_size; i++) {
-        jobs->jobs[i] = (job_t *)malloc(sizeof(job_t));
+        jobs->jobs[i] = malloc(sizeof(job_t));
         extract_job(bytes, (jobs->jobs[i]));
     }
 }
@@ -240,7 +240,7 @@ void extract_submit_result(uint8_t **bytes, submit_result_t *result)
 
 server_message_t *decode_server_message(uint8_t *bytes, ssize_t len)
 {
-    server_message_t *server_message = (server_message_t *)malloc(sizeof(server_message_t));
+    server_message_t *server_message = malloc(sizeof(server_message_t));
 
     uint8_t *pos = bytes;
     ssize_t message_size = extract_size(&pos);
@@ -251,7 +251,7 @@ server_message_t *decode_server_message(uint8_t *bytes, ssize_t len)
     {
     case 0:
         server_message->kind = JOBS;
-        server_message->jobs = (jobs_t *)malloc(sizeof(jobs_t));
+        server_message->jobs = malloc(sizeof(jobs_t));
         extract_jobs(&pos, server_message->jobs);
 
         // printf("%p, %p, %p\n", bytes, pos, bytes + len);
@@ -259,7 +259,7 @@ server_message_t *decode_server_message(uint8_t *bytes, ssize_t len)
 
     case 1:
         server_message->kind = SUBMIT_RESULT;
-        server_message->submit_result = (submit_result_t *)malloc(sizeof(submit_result_t));
+        server_message->submit_result = malloc(sizeof(submit_result_t));
         extract_submit_result(&pos, server_message->submit_result);
         break;
 

@@ -29,7 +29,7 @@ uint8_t write_buffers[parallel_mining_works][2048 * 1024];
 
 void update_templates(job_t *job)
 {
-	mining_template_t *mining_template = (mining_template_t *)malloc(sizeof(mining_template_t));
+	mining_template_t *mining_template = malloc(sizeof(mining_template_t));
 	ssize_t chain_index = job->from_group * group_nums + job->to_group;
 	mining_template->job = job;
 	mining_template->chain_task_count = mining_templates[chain_index] ? mining_templates[chain_index]->chain_task_count + 1 : 0;
@@ -62,7 +62,7 @@ void submit_new_block(uint32_t worker_id, job_t *job, uint8_t *nonce)
 	uv_buf_t buf = uv_buf_init((char *)write_buffers[worker_id], message_size + 4);
 	print_hex((uint8_t *)buf.base, buf.len);
 
-	uv_write_t *write_req = (uv_write_t *)malloc(sizeof(uv_write_t));
+	uv_write_t *write_req = malloc(sizeof(uv_write_t));
 	uint32_t buf_count = 1;
 
 	printf("Sending new block\n");
@@ -177,7 +177,7 @@ void start_mining_if_needed()
 
 void alloc_buffer(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf)
 {
-    buf->base = (char *)malloc(suggested_size);
+    buf->base = malloc(suggested_size);
     buf->len = suggested_size;
 }
 
@@ -229,10 +229,10 @@ int main()
 {
 	loop = uv_default_loop();
 
-	uv_tcp_t* socket = (uv_tcp_t*)malloc(sizeof(uv_tcp_t));
+	uv_tcp_t* socket = malloc(sizeof(uv_tcp_t));
 	uv_tcp_init(loop, socket);
 
-	uv_connect_t* connect = (uv_connect_t*)malloc(sizeof(uv_connect_t));
+	uv_connect_t* connect = malloc(sizeof(uv_connect_t));
 
 	struct sockaddr_in dest;
 	uv_ip4_addr("127.0.0.1", 10973, &dest);
