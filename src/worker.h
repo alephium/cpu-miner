@@ -11,6 +11,7 @@
 #include "messages.h"
 #include "blake3.h"
 #include "uv.h"
+#include "template.h"
 
 typedef struct mining_worker_t {
     uint32_t id;
@@ -21,7 +22,7 @@ typedef struct mining_worker_t {
 	uint32_t nonce_update_index;
 	bool found_good_hash;
 
-    job_t *job;
+	mining_template_t *template;
 } mining_worker_t;
 
 void reset_worker(mining_worker_t *worker)
@@ -48,7 +49,7 @@ uint8_t write_buffers[parallel_mining_works][2048 * 1024];
 ssize_t write_new_block(mining_worker_t *worker)
 {
 	uint32_t worker_id = worker->id;
-	job_t *job = worker->job;
+	job_t *job = worker->template->job;
 	uint8_t *nonce = worker->nonce;
 	uint8_t *write_pos = write_buffers[worker_id];
 
@@ -64,6 +65,11 @@ ssize_t write_new_block(mining_worker_t *worker)
 	write_blob(&write_pos, &job->txs_blob);
 
 	return message_size + 4;
+}
+
+void setup_template(mining_worker_t *worker, mining_template_t *template)
+{
+	worker->template = template;
 }
 
 #endif // ALEPHIUM_WORKER_H

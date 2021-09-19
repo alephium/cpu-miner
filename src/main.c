@@ -44,7 +44,7 @@ void mine_(mining_worker_t *worker)
 	update_nonce(worker);
 
 	blake3_hasher *hasher = &worker->hasher;
-	job_t *job = worker->job;
+	job_t *job = worker->template->job;
 	blob_t *header = &job->header_blob;
 
 	blake3_hasher_init(hasher);
@@ -88,7 +88,8 @@ void after_mine(uv_work_t *req, int status)
 		submit_new_block(worker);
 	}
 
-	uint32_t chain_index = worker->job->from_group * group_nums + worker->job->to_group;
+	job_t *job = worker->template->job;
+	uint32_t chain_index = job->from_group * group_nums + job->to_group;
 	mining_counts[chain_index] += worker->hash_count - mining_steps;
 	continue_mine(worker);
 }
@@ -96,7 +97,7 @@ void after_mine(uv_work_t *req, int status)
 void mine_on_chain(mining_worker_t *worker, uint32_t to_mine_index)
 {
 	uint32_t worker_id = worker->id;
-	worker->job = mining_templates[to_mine_index]->job;
+	setup_template(worker, mining_templates[to_mine_index]);
 	req[worker_id].data = (void *)worker;
 	mining_counts[to_mine_index] += mining_steps;
 	uv_queue_work(loop, &req[worker_id], mine, after_mine);
