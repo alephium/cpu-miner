@@ -24,7 +24,7 @@ void free_template(mining_template_t *template)
 {
     template->ref_count -= 1;
     if (template->ref_count == 0) {
-        free(template->job);
+        free_job(template->job);
         free(template);
     }
 }

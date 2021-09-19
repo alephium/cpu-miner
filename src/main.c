@@ -22,6 +22,7 @@ void on_write_end(uv_write_t *req, int status)
         fprintf(stderr, "error on_write_end");
         exit(1);
     }
+    free(req);
     printf("Sent new block\n");
 }
 
@@ -29,7 +30,7 @@ void submit_new_block(mining_worker_t *worker)
 {
     ssize_t buf_size = write_new_block(worker);
     uv_buf_t buf = uv_buf_init((char *)write_buffers[worker->id], buf_size);
-    print_hex((uint8_t *)buf.base, buf.len);
+    print_hex("new block", (uint8_t *)buf.base, buf.len);
 
     uv_write_t *write_req = malloc(sizeof(uv_write_t));
     uint32_t buf_count = 1;
@@ -56,9 +57,9 @@ void mine_(mining_worker_t *worker)
     blake3_hasher_finalize(hasher, worker->hash, BLAKE3_OUT_LEN);
 
     if (check_hash(worker->hash, &job->target, job->from_group, job->to_group)) {
-        printf("found: %s\n", bytes_to_hex(worker->hash, 32));
-        printf("with nonce: %s\n", bytes_to_hex(worker->nonce, 24));
-        printf("with target: %s\n", bytes_to_hex(job->target.blob, job->target.len));
+        print_hex("found", worker->hash, 32);
+        print_hex("with nonce", worker->nonce, 24);
+        print_hex("with target", job->target.blob, job->target.len);
         printf("with groups: %d %d\n", job->from_group, job->to_group);
         worker->found_good_hash = true;
         return;
@@ -194,6 +195,10 @@ void on_read(uv_stream_t *server, ssize_t nread, const uv_buf_t *buf)
         exit(1);
     }
 
+    if (nread == 0) {
+        return;
+    }
+
     server_message_t *message = decode_buf(buf, nread);
     if (!message) {
         return;
@@ -214,6 +219,7 @@ void on_read(uv_stream_t *server, ssize_t nread, const uv_buf_t *buf)
         break;
     }
 
+    free(buf->base);
     free_server_message_except_jobs(message);
     // uv_close((uv_handle_t *) server, free_close_cb);
 }

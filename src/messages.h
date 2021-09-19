@@ -37,10 +37,10 @@ char *bytes_to_hex(uint8_t *bytes, ssize_t len)
     return hex_string;
 }
 
-void print_hex(uint8_t *data, ssize_t nread)
+void print_hex(char* prefix, uint8_t *data, ssize_t nread)
 {
     char *hex_string = bytes_to_hex(data, nread);
-    printf("%s\n", hex_string);
+    printf("%s: %s\n", prefix, hex_string);
     free(hex_string);
 }
 
