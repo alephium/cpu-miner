@@ -54,11 +54,30 @@ static void extract_jobs_message_test(void **state)
 {
     assert_int_equal(strlen(hex_server_message0), 13810);
     blob_t blob;
-    hex_to_bytes(hex_server_message0, &blob);
+    server_message_t *message;
 
-    server_message_t *message = decode_server_message_from_blob(&blob);
+    hex_to_bytes(hex_server_message0, &blob);
+    message = decode_server_message(&blob);
     assert_int_equal(message->kind, JOBS);
     assert_int_equal(message->jobs->len, 16);
+    assert_int_equal(blob.len, 0);
+
+    char *partial_message = "00001af5000000001000000000000000000000012e00070000";
+    hex_to_bytes(partial_message, &blob);
+    message = decode_server_message(&blob);
+    assert_null(message);
+    assert_int_equal(blob.len, 25);
+    assert_string_equal(bytes_to_hex(blob.blob, blob.len), partial_message);
+
+    char long_message[strlen(hex_server_message0) + strlen(partial_message) + 1];
+    strcpy(long_message, hex_server_message0);
+    strcat(long_message, partial_message);
+    hex_to_bytes(long_message, &blob);
+    message = decode_server_message(&blob);
+    assert_int_equal(message->kind, JOBS);
+    assert_int_equal(message->jobs->len, 16);
+    assert_int_equal(blob.len, 25);
+    assert_string_equal(bytes_to_hex(blob.blob, blob.len), partial_message);
 }
 
 char *hex_server_message1 = "0000000a01000000000000000101";
@@ -67,7 +86,7 @@ static void extract_submit_result_message_test(void **state)
     blob_t blob;
     hex_to_bytes(hex_server_message0, &blob);
 
-    server_message_t *message = decode_server_message_from_blob(&blob);
+    server_message_t *message = decode_server_message(&blob);
     assert_int_equal(message->kind, SUBMIT_RESULT);
     assert_int_equal(message->submit_result->from_group, 0);
     assert_int_equal(message->submit_result->to_group, 1);

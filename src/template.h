@@ -24,7 +24,6 @@ void free_template(mining_template_t *template)
 {
     template->ref_count -= 1;
     if (template->ref_count == 0) {
-        printf("free template: %llu\n", template->chain_task_count);
         free(template->job);
         free(template);
     }

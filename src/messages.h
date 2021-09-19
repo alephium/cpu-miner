@@ -239,15 +239,25 @@ void extract_submit_result(uint8_t **bytes, submit_result_t *result)
     result->status = extract_bool(bytes);
 }
 
-server_message_t *decode_server_message(uint8_t *bytes, ssize_t len)
+server_message_t *decode_server_message(blob_t *blob)
 {
-    server_message_t *server_message = malloc(sizeof(server_message_t));
+    uint8_t *bytes = blob->blob;
+    ssize_t len = blob->len;
+
+    if (len <= 4) {
+        return NULL; // not enough bytes for decoding
+    }
 
     uint8_t *pos = bytes;
     ssize_t message_size = extract_size(&pos);
-    assert(message_size + 4 == len);
     assert(pos == bytes + 4);
 
+    ssize_t message_byte_size = message_size + 4;
+    if (len < message_byte_size) {
+        return NULL; // not enough bytes for decoding
+    }
+
+    server_message_t *server_message = malloc(sizeof(server_message_t));
     switch (extract_byte(&pos))
     {
     case 0:
@@ -269,13 +279,15 @@ server_message_t *decode_server_message(uint8_t *bytes, ssize_t len)
         exit(1);
     }
 
-    assert(pos == (bytes + len));
-    return server_message;
-}
+    assert(pos == (bytes + message_byte_size));
+    if (message_byte_size < len) {
+        blob->len = len - message_byte_size;
+        memcpy(blob->blob, pos, blob->len);
+    } else {
+        blob->len = 0;
+    }
 
-server_message_t *decode_server_message_from_blob(blob_t *blob)
-{
-    return decode_server_message(blob->blob, blob->len);
+    return server_message;
 }
 
 #endif // ALEPHIUM_MESSAGE_H

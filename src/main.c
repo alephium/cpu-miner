@@ -158,6 +158,35 @@ static void free_close_cb(uv_handle_t *handle)
     free(handle);
 }
 
+uint8_t read_buf[2048 * 1024 * chain_nums];
+blob_t read_blob = { read_buf, 0 };
+server_message_t *decode_buf(const uv_buf_t *buf, ssize_t nread)
+{
+    if (read_blob.len == 0) {
+        read_blob.blob = (uint8_t *)buf->base;
+        read_blob.len = nread;
+        server_message_t *message = decode_server_message(&read_blob);
+        if (message) {
+            // some bytes left
+            if (read_blob.len > 0) {
+                memcpy(read_buf, read_blob.blob, read_blob.len);
+                read_blob.blob = read_buf;
+            }
+            return message;
+        } else { // no bytes consumed
+            memcpy(read_buf, buf->base, nread);
+            read_blob.blob = read_buf;
+            read_blob.len = nread;
+            return NULL;
+        }
+    } else {
+        assert(read_blob.blob == read_buf);
+        memcpy(read_buf + read_blob.len, buf->base, nread);
+        read_blob.len += nread;
+        return decode_server_message(&read_blob);
+    }
+}
+
 void on_read(uv_stream_t *server, ssize_t nread, const uv_buf_t *buf)
 {
     if (nread == -1) {
@@ -165,7 +194,11 @@ void on_read(uv_stream_t *server, ssize_t nread, const uv_buf_t *buf)
         exit(1);
     }
 
-    server_message_t *message = decode_server_message((uint8_t *)buf->base, nread);
+    server_message_t *message = decode_buf(buf, nread);
+    if (!message) {
+        return;
+    }
+
     printf("message type: %d\n", message->kind);
     switch (message->kind)
     {
