@@ -134,6 +134,16 @@ void free_server_message_except_jobs(server_message_t *message)
     free(message);
 }
 
+void write_size(uint8_t **bytes, ssize_t size)
+{
+    (*bytes)[0] = (size >> 24) & 0xFF;
+    (*bytes)[1] = (size >> 16) & 0xFF;
+    (*bytes)[2] = (size >> 8) & 0xFF;
+    (*bytes)[3] = size & 0xFF;
+    *bytes = *bytes + 4;
+    return;
+}
+
 ssize_t decode_size(uint8_t *bytes)
 {
     return bytes[0] << 24 | bytes[1] << 16 | bytes[2] << 8 | bytes[3];
@@ -144,6 +154,12 @@ ssize_t extract_size(uint8_t **bytes)
     ssize_t size = decode_size(*bytes);
     *bytes = *bytes + 4;
     return size;
+}
+
+void write_byte(uint8_t **bytes, uint8_t byte)
+{
+    (*bytes)[0] = byte;
+    *bytes = *bytes + 1;
 }
 
 uint8_t extract_byte(uint8_t **bytes)
@@ -166,6 +182,17 @@ bool extract_bool(uint8_t **bytes)
         fprintf(stderr, "Invaid bool value");
         exit(1);
     }
+}
+
+void write_bytes(uint8_t **bytes, uint8_t *data, ssize_t len)
+{
+    memcpy(*bytes, data, len);
+    *bytes = *bytes + len;
+}
+
+void write_blob(uint8_t **bytes, blob_t *blob)
+{
+    write_bytes(bytes, blob->blob, blob->len);
 }
 
 void extract_blob(uint8_t **bytes, blob_t *blob)

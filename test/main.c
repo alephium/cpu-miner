@@ -111,6 +111,59 @@ static void check_target_test(void **state)
     assert_int_equal(check_target(hash.blob, &target), false);
 }
 
+static void write_size_test(void **state)
+{
+    uint8_t buf[4];
+    uint8_t *pos = buf;
+
+    write_size(&pos, 257);
+    assert_int_equal(pos, buf + 4);
+    assert_int_equal(buf[0], 0);
+    assert_int_equal(buf[1], 0);
+    assert_int_equal(buf[2], 1);
+    assert_int_equal(buf[3], 1);
+}
+
+static void write_byte_test(void **state)
+{
+    uint8_t buf[1];
+    uint8_t *pos = buf;
+
+    write_byte(&pos, 111);
+    assert_int_equal(pos, buf + 1);
+    assert_int_equal(buf[0], 111);
+}
+
+static void write_bytes_test(void **state)
+{
+    uint8_t buf[5];
+    uint8_t *pos = buf;
+
+    blob_t blob;
+    hex_to_bytes("01020a0b", &blob);
+    write_bytes(&pos, blob.blob, blob.len);
+    assert_int_equal(pos, buf + 4);
+    assert_int_equal(buf[0], 1);
+    assert_int_equal(buf[1], 2);
+    assert_int_equal(buf[2], 10);
+    assert_int_equal(buf[3], 11);
+}
+
+static void write_blob_test(void **state)
+{
+    uint8_t buf[10];
+    uint8_t *pos = buf;
+
+    blob_t blob;
+    hex_to_bytes("01020a0b", &blob);
+    write_blob(&pos, &blob);
+    assert_int_equal(pos, buf + 4);
+    assert_int_equal(buf[0], 1);
+    assert_int_equal(buf[1], 2);
+    assert_int_equal(buf[2], 10);
+    assert_int_equal(buf[3], 11);
+}
+
 int main(void) {
 
     const struct CMUnitTest tests[] = {
@@ -120,6 +173,10 @@ int main(void) {
         cmocka_unit_test(extract_jobs_test),
         cmocka_unit_test(extract_jobs_message_test),
         cmocka_unit_test(check_target_test),
+        cmocka_unit_test(write_size_test),
+        cmocka_unit_test(write_byte_test),
+        cmocka_unit_test(write_bytes_test),
+        cmocka_unit_test(write_blob_test),
     };
 
 
