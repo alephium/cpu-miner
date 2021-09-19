@@ -111,6 +111,15 @@ static void check_target_test(void **state)
     assert_int_equal(check_target(hash.blob, &target), false);
 }
 
+static void check_index_test(void **state)
+{
+    blob_t hash;
+    hex_to_bytes("00000000aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaae", &hash);
+
+    assert_int_equal(check_index(hash.blob, 3, 2), true);
+    assert_int_equal(check_index(hash.blob, 3, 3), false);
+}
+
 static void write_size_test(void **state)
 {
     uint8_t buf[4];
@@ -173,6 +182,7 @@ int main(void) {
         cmocka_unit_test(extract_jobs_test),
         cmocka_unit_test(extract_jobs_message_test),
         cmocka_unit_test(check_target_test),
+        cmocka_unit_test(check_index_test),
         cmocka_unit_test(write_size_test),
         cmocka_unit_test(write_byte_test),
         cmocka_unit_test(write_bytes_test),
