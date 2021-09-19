@@ -123,6 +123,7 @@ void free_server_message_except_jobs(server_message_t *message)
     switch (message->kind)
     {
     case JOBS:
+        free(message->jobs->jobs);
         free(message->jobs);
         break;
 

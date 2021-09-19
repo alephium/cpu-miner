@@ -11,30 +11,10 @@
 #include "blake3.h"
 #include "pow.h"
 #include "worker.h"
+#include "template.h"
 
 uv_loop_t *loop;
-
-typedef struct mining_template_t {
-	job_t *job;
-	uint64_t chain_task_count; // increase this by one everytime the template for the chain is updated
-} mining_template_t;
-
-mining_template_t* mining_templates[chain_nums] = {};
-uint64_t mining_counts[chain_nums];
-uint64_t task_counts[chain_nums];
-bool mining_templates_initialized = false;
-
 uv_stream_t *tcp;
-uint8_t write_buffers[parallel_mining_works][2048 * 1024];
-
-void update_templates(job_t *job)
-{
-	mining_template_t *mining_template = malloc(sizeof(mining_template_t));
-	ssize_t chain_index = job->from_group * group_nums + job->to_group;
-	mining_template->job = job;
-	mining_template->chain_task_count = mining_templates[chain_index] ? mining_templates[chain_index]->chain_task_count + 1 : 0;
-	mining_templates[chain_index] = mining_template;
-}
 
 void on_write_end(uv_write_t *req, int status)
 {
@@ -45,21 +25,10 @@ void on_write_end(uv_write_t *req, int status)
 	printf("Sent new block\n");
 }
 
-void submit_new_block(uint32_t worker_id, job_t *job, uint8_t *nonce)
+void submit_new_block(mining_worker_t *worker)
 {
-	uint8_t *write_pos = write_buffers[worker_id];
-	ssize_t block_size = 24 + job->header_blob.len + job->txs_blob.len;
-	ssize_t message_size = 1 + 4 + block_size;
-
-	printf("message: %ld\n", message_size);
-	write_size(&write_pos, message_size);
-	write_byte(&write_pos, 0); // message type
-	write_size(&write_pos, block_size);
-	write_bytes(&write_pos, nonce, 24);
-	write_blob(&write_pos, &job->header_blob);
-	write_blob(&write_pos, &job->txs_blob);
-
-	uv_buf_t buf = uv_buf_init((char *)write_buffers[worker_id], message_size + 4);
+	ssize_t buf_size = write_new_block(worker);
+	uv_buf_t buf = uv_buf_init((char *)write_buffers[worker->id], buf_size);
 	print_hex((uint8_t *)buf.base, buf.len);
 
 	uv_write_t *write_req = malloc(sizeof(uv_write_t));
@@ -69,72 +38,71 @@ void submit_new_block(uint32_t worker_id, job_t *job, uint8_t *nonce)
 	uv_write(write_req, tcp, &buf, buf_count, on_write_end);
 }
 
-void mine_(mining_worker_t *worker, mining_work_t *work)
+void mine_(mining_worker_t *worker)
 {
 	worker->hash_count++;
 	update_nonce(worker);
 
 	blake3_hasher *hasher = &worker->hasher;
+	job_t *job = worker->job;
+	blob_t *header = &job->header_blob;
+
 	blake3_hasher_init(hasher);
 	blake3_hasher_update(hasher, worker->nonce, 24);
-	blob_t *header = &work->job->header_blob;
 	blake3_hasher_update(hasher, header->blob, header->len);
 	blake3_hasher_finalize(hasher, worker->hash, BLAKE3_OUT_LEN);
 	blake3_hasher_init(hasher);
 	blake3_hasher_update(hasher, worker->hash, BLAKE3_OUT_LEN);
 	blake3_hasher_finalize(hasher, worker->hash, BLAKE3_OUT_LEN);
 
-	if (check_hash(worker->hash, &work->job->target, work->job->from_group, work->job->to_group)) {
+	if (check_hash(worker->hash, &job->target, job->from_group, job->to_group)) {
 		printf("found: %s\n", bytes_to_hex(worker->hash, 32));
-		printf("with noce: %s\n", bytes_to_hex(worker->nonce, 24));
-		printf("with target: %s\n", bytes_to_hex(work->job->target.blob, work->job->target.len));
-		printf("with groups: %d %d\n", work->job->from_group, work->job->to_group);
+		printf("with nonce: %s\n", bytes_to_hex(worker->nonce, 24));
+		printf("with target: %s\n", bytes_to_hex(job->target.blob, job->target.len));
+		printf("with groups: %d %d\n", job->from_group, job->to_group);
 		worker->found_good_hash = true;
 		return;
 	} else if (worker->hash_count == mining_steps) {
 		return;
 	} else {
-		mine_(worker, work);
+		mine_(worker);
 	}
 }
 
 void mine(uv_work_t *req)
 {
-	mining_work_t *work = (mining_work_t *)req->data;
+	mining_worker_t *worker = (mining_worker_t *)req->data;
 	// printf("start mine: %d %d\n", work->job->from_group, work->job->to_group);
-	mining_worker_t *worker = &mining_workers[work->worker_id];
 	reset_worker(worker);
-	mine_(worker, work);
+	mine_(worker);
 }
 
-void continue_mine(uint32_t worker_id);
+void continue_mine(mining_worker_t *worker);
 
 void after_mine(uv_work_t *req, int status)
 {
-	mining_work_t *work = (mining_work_t *)req->data;
-	mining_worker_t *worker = &mining_workers[work->worker_id];
+	mining_worker_t *worker = (mining_worker_t *)req->data;
 	// printf("after mine: %d %d %d\n", work->job->from_group, work->job->to_group, worker->hash_count);
 
 	if (worker->found_good_hash) {
-		submit_new_block(work->worker_id, work->job, worker->nonce);
+		submit_new_block(worker);
 	}
 
-	uint32_t chain_index = work->job->from_group * group_nums + work->job->to_group;
+	uint32_t chain_index = worker->job->from_group * group_nums + worker->job->to_group;
 	mining_counts[chain_index] += worker->hash_count - mining_steps;
-	continue_mine(work->worker_id);
+	continue_mine(worker);
 }
 
-void mine_on_chain(uint32_t worker_id, uint32_t to_mine_index)
+void mine_on_chain(mining_worker_t *worker, uint32_t to_mine_index)
 {
-	mining_work_t *work = &mining_works[worker_id];
-	work->job = mining_templates[to_mine_index]->job;
-	work->worker_id = worker_id;
-	req[worker_id].data = (void *)work;
+	uint32_t worker_id = worker->id;
+	worker->job = mining_templates[to_mine_index]->job;
+	req[worker_id].data = (void *)worker;
 	mining_counts[to_mine_index] += mining_steps;
 	uv_queue_work(loop, &req[worker_id], mine, after_mine);
 }
 
-void continue_mine(uint32_t worker_id)
+void continue_mine(mining_worker_t *worker)
 {
 	uint32_t to_mine_index = 0;
 	uint64_t least_hash_count = mining_counts[0];
@@ -146,7 +114,7 @@ void continue_mine(uint32_t worker_id)
 		}
 	}
 
-	mine_on_chain(worker_id, to_mine_index);
+	mine_on_chain(worker, to_mine_index);
 }
 
 void start_mining()
@@ -154,7 +122,8 @@ void start_mining()
 	assert(mining_templates_initialized == true);
 
 	for (uint32_t i = 0; i < parallel_mining_works; i++) {
-		mine_on_chain(i, i % chain_nums);
+		mining_workers[i].id = i;
+		mine_on_chain(&mining_workers[i], i % chain_nums);
 	}
 }
 
