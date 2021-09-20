@@ -52,4 +52,19 @@ void update_templates(job_t *job)
     mining_templates[chain_index] = new_template;
 }
 
+uint32_t next_chain_to_mine()
+{
+    uint32_t to_mine_index = 0;
+    uint64_t least_hash_count = mining_counts[0];
+    for (int i = 1; i < chain_nums; i ++) {
+        uint64_t i_hash_count = mining_counts[i];
+        if (i_hash_count < least_hash_count) {
+            to_mine_index = i;
+            least_hash_count = i_hash_count;
+        }
+    }
+
+    return to_mine_index;
+}
+
 #endif // ALEPHIUM_TEMPLATE_H

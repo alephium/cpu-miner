@@ -12,6 +12,7 @@
 #include "pow.h"
 #include "worker.h"
 #include "template.h"
+#include "mining.h"
 
 uv_loop_t *loop;
 uv_stream_t *tcp;
@@ -23,7 +24,7 @@ void on_write_end(uv_write_t *req, int status)
         exit(1);
     }
     free(req);
-    printf("Sent new block\n");
+    printf("sent new block\n");
 }
 
 void submit_new_block(mining_worker_t *worker)
@@ -35,47 +36,14 @@ void submit_new_block(mining_worker_t *worker)
     uv_write_t *write_req = malloc(sizeof(uv_write_t));
     uint32_t buf_count = 1;
 
-    printf("Sending new block\n");
+    printf("sending new block\n");
     uv_write(write_req, tcp, &buf, buf_count, on_write_end);
-}
-
-void mine_(mining_worker_t *worker)
-{
-    worker->hash_count++;
-    update_nonce(worker);
-
-    blake3_hasher *hasher = &worker->hasher;
-    job_t *job = worker->template->job;
-    blob_t *header = &job->header_blob;
-
-    blake3_hasher_init(hasher);
-    blake3_hasher_update(hasher, worker->nonce, 24);
-    blake3_hasher_update(hasher, header->blob, header->len);
-    blake3_hasher_finalize(hasher, worker->hash, BLAKE3_OUT_LEN);
-    blake3_hasher_init(hasher);
-    blake3_hasher_update(hasher, worker->hash, BLAKE3_OUT_LEN);
-    blake3_hasher_finalize(hasher, worker->hash, BLAKE3_OUT_LEN);
-
-    if (check_hash(worker->hash, &job->target, job->from_group, job->to_group)) {
-        print_hex("found", worker->hash, 32);
-        print_hex("with nonce", worker->nonce, 24);
-        print_hex("with target", job->target.blob, job->target.len);
-        printf("with groups: %d %d\n", job->from_group, job->to_group);
-        worker->found_good_hash = true;
-        return;
-    } else if (worker->hash_count == mining_steps) {
-        return;
-    } else {
-        mine_(worker);
-    }
 }
 
 void mine(uv_work_t *req)
 {
     mining_worker_t *worker = (mining_worker_t *)req->data;
-    // printf("start mine: %d %d\n", work->job->from_group, work->job->to_group);
-    reset_worker(worker);
-    mine_(worker);
+    start_worker_mining(worker);
 }
 
 void continue_mine(mining_worker_t *worker);
@@ -108,16 +76,7 @@ void mine_on_chain(mining_worker_t *worker, uint32_t to_mine_index)
 
 void continue_mine(mining_worker_t *worker)
 {
-    uint32_t to_mine_index = 0;
-    uint64_t least_hash_count = mining_counts[0];
-    for (int i = 1; i < chain_nums; i ++) {
-        uint64_t i_hash_count = mining_counts[i];
-        if (i_hash_count < least_hash_count) {
-            to_mine_index = i;
-            least_hash_count = i_hash_count;
-        }
-    }
-
+    uint32_t to_mine_index = next_chain_to_mine();
     mine_on_chain(worker, to_mine_index);
 }
 
