@@ -149,8 +149,8 @@ server_message_t *decode_buf(const uv_buf_t *buf, ssize_t nread)
 
 void on_read(uv_stream_t *server, ssize_t nread, const uv_buf_t *buf)
 {
-    if (nread == -1) {
-        fprintf(stderr, "error on_read");
+    if (nread < 0) {
+        fprintf(stderr, "error on_read %d\n", nread);
         exit(1);
     }
 
