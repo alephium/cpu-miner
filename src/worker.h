@@ -19,7 +19,6 @@ typedef struct mining_worker_t {
     uint8_t hash[32];
     uint32_t hash_count;
     uint8_t nonce[24];
-    uint32_t nonce_update_index;
     bool found_good_hash;
 
     mining_template_t *template;
@@ -31,15 +30,14 @@ void reset_worker(mining_worker_t *worker)
     for (int i = 0; i < 24; i++) {
         worker->nonce[i] = rand();
     }
-    worker->nonce_update_index = 0;
     worker->found_good_hash = false;
 }
 
 void update_nonce(mining_worker_t *worker)
 {
-    uint32_t old_index = worker->nonce_update_index;
-    worker->nonce[old_index] += 1;
-    worker->nonce_update_index = (old_index + 1) % 24;
+    int64_t *short_nonce = (int64_t *)worker->nonce;
+    // printf("%s\n", bytes_to_hex(worker->nonce, 24));
+    *short_nonce += 1;
 }
 
 uv_work_t req[parallel_mining_works];

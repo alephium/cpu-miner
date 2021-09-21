@@ -23,6 +23,7 @@ void mine_internal(mining_worker_t *worker)
     if (check_hash(worker->hash, &job->target, job->from_group, job->to_group)) {
         print_hex("found", worker->hash, 32);
         print_hex("with nonce", worker->nonce, 24);
+        printf("with hash count: %d\n", worker->hash_count);
         print_hex("with target", job->target.blob, job->target.len);
         printf("with groups: %d %d\n", job->from_group, job->to_group);
         worker->found_good_hash = true;

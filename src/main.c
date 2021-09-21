@@ -4,6 +4,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include <time.h>
 
 #include "constants.h"
 #include "uv.h"
@@ -16,6 +17,8 @@
 
 uv_loop_t *loop;
 uv_stream_t *tcp;
+
+time_t start_time = 0;
 
 void on_write_end(uv_write_t *req, int status)
 {
@@ -59,7 +62,8 @@ void after_mine(uv_work_t *req, int status)
 
     job_t *job = worker->template->job;
     uint32_t chain_index = job->from_group * group_nums + job->to_group;
-    mining_counts[chain_index] += worker->hash_count - mining_steps;
+    mining_counts[chain_index] -= mining_steps;
+    mining_counts[chain_index] += worker->hash_count;
 
     free_template(worker->template);
     continue_mine(worker);
@@ -83,6 +87,8 @@ void continue_mine(mining_worker_t *worker)
 void start_mining()
 {
     assert(mining_templates_initialized == true);
+
+    start_time = time(NULL);
 
     for (uint32_t i = 0; i < parallel_mining_works; i++) {
         mining_workers[i].id = i;
@@ -149,8 +155,18 @@ server_message_t *decode_buf(const uv_buf_t *buf, ssize_t nread)
 
 void on_read(uv_stream_t *server, ssize_t nread, const uv_buf_t *buf)
 {
+    time_t current_time = time(NULL);
+    if (start_time != 0 && current_time > start_time) {
+
+        uint64_t total_hash = 0;
+        for (int i = 0; i < chain_nums; i++) {
+            total_hash += mining_counts[i];
+        }
+        printf("hashrate: %lld (hash/sec)\n", total_hash / (current_time - start_time));
+    }
+
     if (nread < 0) {
-        fprintf(stderr, "error on_read %d\n", nread);
+        fprintf(stderr, "error on_read %ld\n", nread);
         exit(1);
     }
 
