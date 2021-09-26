@@ -210,15 +210,47 @@ void on_connect(uv_connect_t *req, int status)
     uv_read_start(req->handle, alloc_buffer, on_read);
 }
 
+bool is_valid_ip_address(char *ip_address)
+{
+    struct sockaddr_in sa;
+    int result = inet_pton(AF_INET, ip_address, &(sa.sin_addr));
+    return result != 0;
+}
+
+int hostname_to_ip(char *ip_address, char *hostname)
+{
+    struct addrinfo hints, *servinfo;
+    memset(&hints, 0, sizeof hints);
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+
+    int res = getaddrinfo(hostname, NULL, &hints, &servinfo);
+    if (res != 0) {
+      fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(res));
+      return 1;
+    }
+
+    struct sockaddr_in *h = (struct sockaddr_in *) servinfo->ai_addr;
+    strcpy(ip_address, inet_ntoa(h->sin_addr));
+
+    freeaddrinfo(servinfo);
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     char broker_ip[16];
     memset(broker_ip, '\0', sizeof(broker_ip));
 
-    if (argc >= 2)
-      strcpy(broker_ip, argv[1]);
-    else
+    if (argc >= 2) {
+      if (is_valid_ip_address(argv[1])) {
+        strcpy(broker_ip, argv[1]);
+      } else {
+        hostname_to_ip(broker_ip, argv[1]);
+      }
+    } else {
       strcpy(broker_ip, "127.0.0.1");
+    }
 
     printf("Will connect to broker @%s:10973\n", broker_ip);
 
