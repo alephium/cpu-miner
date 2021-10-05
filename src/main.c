@@ -31,6 +31,11 @@ void on_write_end(uv_write_t *req, int status)
 
 void submit_new_block(mining_worker_t *worker)
 {
+    if (!expire_template_for_new_block(worker->template)) {
+        printf("mined a parallel block, will not submit\n");
+        return;
+    }
+
     ssize_t buf_size = write_new_block(worker);
     uv_buf_t buf = uv_buf_init((char *)write_buffers[worker->id], buf_size);
     print_hex("new block", (uint8_t *)buf.base, buf.len);
@@ -79,8 +84,14 @@ void mine_on_chain(mining_worker_t *worker, uint32_t to_mine_index)
 
 void continue_mine(mining_worker_t *worker)
 {
-    uint32_t to_mine_index = next_chain_to_mine();
-    mine_on_chain(worker, to_mine_index);
+    int32_t to_mine_index = next_chain_to_mine();
+
+    if (to_mine_index != -1) {
+        mine_on_chain(worker, to_mine_index);
+    } else {
+        printf("No task available, quitting...\n");
+        exit(1);
+    }
 }
 
 void start_mining()

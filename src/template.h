@@ -30,7 +30,7 @@ void free_template(mining_template_t *template)
 
 mining_template_t* mining_templates[chain_nums] = {};
 uint64_t mining_counts[chain_nums];
-uint64_t task_counts[chain_nums];
+uint64_t task_counts[chain_nums] = { 0 };
 bool mining_templates_initialized = false;
 
 void update_templates(job_t *job)
@@ -40,24 +40,40 @@ void update_templates(job_t *job)
     new_template->ref_count = 1; // referred by mining_templates
 
     ssize_t chain_index = job->from_group * group_nums + job->to_group;
+    task_counts[chain_index] += 1;
+    new_template->chain_task_count = task_counts[chain_index];
+
     mining_template_t *last_template = mining_templates[chain_index];
     if (last_template) {
-        new_template->chain_task_count = last_template->chain_task_count + 1;
         free_template(last_template);
-    } else {
-        new_template->chain_task_count = 0;
     }
-
     mining_templates[chain_index] = new_template;
 }
 
-uint32_t next_chain_to_mine()
+bool expire_template_for_new_block(mining_template_t *template)
 {
-    uint32_t to_mine_index = 0;
-    uint64_t least_hash_count = mining_counts[0];
-    for (int i = 1; i < chain_nums; i ++) {
+    job_t *job = template->job;
+    ssize_t chain_index = job->from_group * group_nums + job->to_group;
+    uint64_t block_task_count = template->chain_task_count;
+
+    mining_template_t *latest_template = mining_templates[chain_index];
+    if (latest_template) {
+        printf("new block mined, remove the outdated template\n");
+        mining_templates[chain_index] = NULL;
+        free_template(latest_template);
+        return true;
+    } else {
+        return false;
+    }
+}
+
+int32_t next_chain_to_mine()
+{
+    int32_t to_mine_index = -1;
+    uint64_t least_hash_count = UINT64_MAX;
+    for (int32_t i = 0; i < chain_nums; i ++) {
         uint64_t i_hash_count = mining_counts[i];
-        if (i_hash_count < least_hash_count) {
+        if (mining_templates[i] && (i_hash_count < least_hash_count)) {
             to_mine_index = i;
             least_hash_count = i_hash_count;
         }
