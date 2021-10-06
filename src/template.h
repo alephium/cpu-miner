@@ -14,7 +14,7 @@
 
 typedef struct mining_template_t {
     job_t *job;
-    uint32_t ref_count;
+    volatile uint32_t ref_count;
 
     uint64_t chain_task_count; // increase this by one everytime the template for the chain is updated
 } mining_template_t;
@@ -28,8 +28,8 @@ void free_template(mining_template_t *template)
     }
 }
 
-mining_template_t* mining_templates[chain_nums] = {};
-uint64_t mining_counts[chain_nums];
+volatile mining_template_t* mining_templates[chain_nums] = {};
+volatile uint64_t mining_counts[chain_nums];
 uint64_t task_counts[chain_nums] = { 0 };
 bool mining_templates_initialized = false;
 
@@ -43,7 +43,7 @@ void update_templates(job_t *job)
     task_counts[chain_index] += 1;
     new_template->chain_task_count = task_counts[chain_index];
 
-    mining_template_t *last_template = mining_templates[chain_index];
+    mining_template_t *last_template = (mining_template_t *)mining_templates[chain_index];
     if (last_template) {
         free_template(last_template);
     }
@@ -56,7 +56,7 @@ bool expire_template_for_new_block(mining_template_t *template)
     ssize_t chain_index = job->from_group * group_nums + job->to_group;
     uint64_t block_task_count = template->chain_task_count;
 
-    mining_template_t *latest_template = mining_templates[chain_index];
+    mining_template_t *latest_template = (mining_template_t *)(mining_templates[chain_index]);
     if (latest_template) {
         printf("new block mined, remove the outdated template\n");
         mining_templates[chain_index] = NULL;

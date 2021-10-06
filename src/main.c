@@ -31,7 +31,7 @@ void on_write_end(uv_write_t *req, int status)
 
 void submit_new_block(mining_worker_t *worker)
 {
-    if (!expire_template_for_new_block(worker->template)) {
+    if (!expire_template_for_new_block((mining_template_t *)worker->template)) {
         printf("mined a parallel block, will not submit\n");
         return;
     }
@@ -69,14 +69,14 @@ void after_mine(uv_work_t *req, int status)
     mining_counts[chain_index] -= mining_steps;
     mining_counts[chain_index] += worker->hash_count;
 
-    free_template(worker->template);
+    free_template((mining_template_t *)worker->template);
     continue_mine(worker);
 }
 
 void mine_on_chain(mining_worker_t *worker, uint32_t to_mine_index)
 {
     uint32_t worker_id = worker->id;
-    setup_template(worker, mining_templates[to_mine_index]);
+    setup_template(worker, (mining_template_t *)mining_templates[to_mine_index]);
     req[worker_id].data = (void *)worker;
     mining_counts[to_mine_index] += mining_steps;
     uv_queue_work(loop, &req[worker_id], mine, after_mine);

@@ -18,9 +18,9 @@ typedef struct mining_worker_t {
     uint8_t hash[32];
     uint32_t hash_count;
     uint8_t nonce[24];
-    bool found_good_hash;
+    volatile bool found_good_hash;
 
-    mining_template_t *template;
+    volatile mining_template_t *template;
 } mining_worker_t;
 
 void reset_worker(mining_worker_t *worker)
