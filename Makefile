@@ -64,7 +64,7 @@ CC := gcc
 
 
 # Defines the language standards for GCC
-STD := -std=c11 # See man gcc for more options
+STD := -std=gnu11 # See man gcc for more options
 
 # Protection for stack-smashing attack
 STACK := -fstack-protector-all -Wstack-protector
