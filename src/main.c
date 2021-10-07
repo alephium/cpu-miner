@@ -31,7 +31,7 @@ void on_write_end(uv_write_t *req, int status)
 
 void submit_new_block(mining_worker_t *worker)
 {
-    if (!expire_template_for_new_block((mining_template_t *)worker->template)) {
+    if (!expire_template_for_new_block(load_worker__template(worker))) {
         printf("mined a parallel block, will not submit\n");
         return;
     }
@@ -49,7 +49,7 @@ void submit_new_block(mining_worker_t *worker)
 
 void mine(uv_work_t *req)
 {
-    mining_worker_t *worker = (mining_worker_t *)req->data;
+    mining_worker_t *worker = load_req_worker(req);
     start_worker_mining(worker);
 }
 
@@ -57,28 +57,29 @@ void continue_mine(mining_worker_t *worker);
 
 void after_mine(uv_work_t *req, int status)
 {
-    mining_worker_t *worker = (mining_worker_t *)req->data;
+    mining_worker_t *worker = load_req_worker(req);
     // printf("after mine: %d %d %d\n", work->job->from_group, work->job->to_group, worker->hash_count);
 
-    if (worker->found_good_hash) {
+    if (load_worker__found_good_hash(worker)) {
         submit_new_block(worker);
     }
 
-    job_t *job = worker->template->job;
+    mining_template_t *template = load_worker__template(worker);
+    job_t *job = template->job;
     uint32_t chain_index = job->from_group * group_nums + job->to_group;
     mining_counts[chain_index] -= mining_steps;
     mining_counts[chain_index] += worker->hash_count;
 
-    free_template((mining_template_t *)worker->template);
+    free_template(template);
     continue_mine(worker);
 }
 
 void mine_on_chain(mining_worker_t *worker, uint32_t to_mine_index)
 {
     uint32_t worker_id = worker->id;
-    setup_template(worker, (mining_template_t *)mining_templates[to_mine_index]);
-    req[worker_id].data = (void *)worker;
     mining_counts[to_mine_index] += mining_steps;
+    setup_template(worker, load_template(to_mine_index));
+    store_req_data(worker_id, worker);
     uv_queue_work(loop, &req[worker_id], mine, after_mine);
 }
 
@@ -111,7 +112,7 @@ void start_mining_if_needed()
     if (!mining_templates_initialized) {
         bool all_initialized = true;
         for (int i = 0; i < chain_nums; i++) {
-            if (mining_templates[i] == NULL) {
+            if (load_template(i) == NULL) {
                 all_initialized = false;
                 break;
             }

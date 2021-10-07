@@ -9,7 +9,7 @@ void mine_internal(mining_worker_t *worker)
     update_nonce(worker);
 
     blake3_hasher *hasher = &worker->hasher;
-    job_t *job = worker->template->job;
+    job_t *job = load_worker__template(worker)->job;
     blob_t *header = &job->header_blob;
 
     blake3_hasher_init(hasher);
@@ -26,7 +26,7 @@ void mine_internal(mining_worker_t *worker)
         printf("with hash count: %d\n", worker->hash_count);
         print_hex("with target", job->target.blob, job->target.len);
         printf("with groups: %d %d\n", job->from_group, job->to_group);
-        worker->found_good_hash = true;
+        store_worker_found_good_hash(worker, true);
         return;
     } else if (worker->hash_count == mining_steps) {
         return;

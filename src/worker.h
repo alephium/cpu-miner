@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <stdatomic.h>
 
 #include "messages.h"
 #include "blake3.h"
@@ -18,10 +19,30 @@ typedef struct mining_worker_t {
     uint8_t hash[32];
     uint32_t hash_count;
     uint8_t nonce[24];
-    volatile bool found_good_hash;
+    _Atomic(bool) found_good_hash;
 
-    volatile mining_template_t *template;
+    _Atomic(mining_template_t *) template;
 } mining_worker_t;
+
+bool load_worker__found_good_hash(mining_worker_t *worker)
+{
+    return atomic_load(&(worker->found_good_hash));
+}
+
+void store_worker_found_good_hash(mining_worker_t *worker, bool value)
+{
+    atomic_store(&(worker->found_good_hash), value);
+}
+
+mining_template_t *load_worker__template(mining_worker_t *worker)
+{
+    return atomic_load(&(worker->template));
+}
+
+void store_worker__template(mining_worker_t *worker, mining_template_t *template)
+{
+    atomic_store(&(worker->template), template);
+}
 
 void reset_worker(mining_worker_t *worker)
 {
@@ -29,7 +50,7 @@ void reset_worker(mining_worker_t *worker)
     for (int i = 0; i < 24; i++) {
         worker->nonce[i] = rand();
     }
-    worker->found_good_hash = false;
+    store_worker_found_good_hash(worker, false);
 }
 
 void update_nonce(mining_worker_t *worker)
@@ -39,14 +60,33 @@ void update_nonce(mining_worker_t *worker)
     *short_nonce += 1;
 }
 
-uv_work_t req[parallel_mining_works];
+typedef struct mining_req {
+    _Atomic(mining_worker_t *) worker;
+} mining_req_t;
+
+uv_work_t req[parallel_mining_works] = {};
 mining_worker_t mining_workers[parallel_mining_works];
 uint8_t write_buffers[parallel_mining_works][2048 * 1024];
+
+mining_worker_t *load_req_worker(uv_work_t *req)
+{
+    mining_req_t *mining_req = req->data;
+    return atomic_load(&(mining_req->worker));
+}
+
+void store_req_data(ssize_t worker_id, mining_worker_t *worker)
+{
+    if (!req[worker_id].data) {
+        req[worker_id].data = malloc(sizeof(mining_req_t));
+    }
+    mining_req_t *mining_req = req[worker_id].data;
+    atomic_store(&(mining_req->worker), worker);
+}
 
 ssize_t write_new_block(mining_worker_t *worker)
 {
     uint32_t worker_id = worker->id;
-    job_t *job = worker->template->job;
+    job_t *job = load_worker__template(worker)->job;
     uint8_t *nonce = worker->nonce;
     uint8_t *write_pos = write_buffers[worker_id];
 
@@ -66,8 +106,8 @@ ssize_t write_new_block(mining_worker_t *worker)
 
 void setup_template(mining_worker_t *worker, mining_template_t *template)
 {
-    worker->template = template;
-    template->ref_count += 1;
+    add_template__ref_count(template, 1);
+    store_worker__template(worker, template);
 }
 
 #endif // ALEPHIUM_WORKER_H
