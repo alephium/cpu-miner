@@ -5,5 +5,6 @@
 #define chain_nums 16
 #define parallel_mining_works 16
 #define mining_steps 100000
+#define mining_protocol_version 1
 
 #endif // ALEPHIUM_CONSTANTS_H
