@@ -173,7 +173,10 @@ void on_read(uv_stream_t *server, ssize_t nread, const uv_buf_t *buf)
         for (int i = 0; i < chain_nums; i++) {
             total_hash += mining_counts[i];
         }
-        printf("hashrate: %lld (hash/sec)\n", total_hash / (current_time - start_time));
+        printf(
+            "hashrate: %llu (hash/sec)\n",
+            (unsigned long long)(total_hash / (current_time - start_time))
+        );
     }
 
     if (nread < 0) {
@@ -229,6 +232,18 @@ bool is_valid_ip_address(char *ip_address)
     return result != 0;
 }
 
+bool parse_port(const char *raw_port, int *port)
+{
+    char *end = NULL;
+    long value = strtol(raw_port, &end, 10);
+    if (raw_port[0] == '\0' || end == raw_port || *end != '\0' || value <= 0 || value > 65535) {
+        return false;
+    }
+
+    *port = (int)value;
+    return true;
+}
+
 int hostname_to_ip(char *ip_address, char *hostname)
 {
     struct addrinfo hints, *servinfo;
@@ -249,24 +264,65 @@ int hostname_to_ip(char *ip_address, char *hostname)
     return 0;
 }
 
+bool set_broker_ip(char *broker_ip, char *broker_host)
+{
+    if (is_valid_ip_address(broker_host)) {
+        strcpy(broker_ip, broker_host);
+        return true;
+    }
+
+    return hostname_to_ip(broker_ip, broker_host) == 0;
+}
+
 int main(int argc, char **argv)
 {
     setbuf(stdout, NULL);
 
     char broker_ip[16];
     memset(broker_ip, '\0', sizeof(broker_ip));
+    strcpy(broker_ip, "127.0.0.1");
+    int broker_port = 10973;
 
-    if (argc >= 2) {
-      if (is_valid_ip_address(argv[1])) {
-        strcpy(broker_ip, argv[1]);
-      } else {
-        hostname_to_ip(broker_ip, argv[1]);
-      }
+    if (argc >= 2 && argv[1][0] != '-') {
+        if (!set_broker_ip(broker_ip, argv[1])) {
+            return 1;
+        }
+
+        if (argc >= 3) {
+            if (!parse_port(argv[2], &broker_port)) {
+                fprintf(stderr, "invalid broker port: %s\n", argv[2]);
+                return 1;
+            }
+        }
     } else {
-      strcpy(broker_ip, "127.0.0.1");
+        for (int i = 1; i < argc; i++) {
+            if (strcmp(argv[i], "-a") == 0) {
+                if (i + 1 >= argc) {
+                    fprintf(stderr, "missing broker host for -a\n");
+                    return 1;
+                }
+                if (!set_broker_ip(broker_ip, argv[i + 1])) {
+                    return 1;
+                }
+                i += 1;
+            } else if (strcmp(argv[i], "-p") == 0) {
+                if (i + 1 >= argc) {
+                    fprintf(stderr, "missing broker port for -p\n");
+                    return 1;
+                }
+                if (!parse_port(argv[i + 1], &broker_port)) {
+                    fprintf(stderr, "invalid broker port: %s\n", argv[i + 1]);
+                    return 1;
+                }
+                i += 1;
+            } else {
+                fprintf(stderr, "invalid argument: %s\n", argv[i]);
+                return 1;
+            }
+        }
     }
 
-    printf("Will connect to broker @%s:10973\n", broker_ip);
+    printf("Will connect to broker @%s:%d\n", broker_ip, broker_port);
 
     loop = uv_default_loop();
 
@@ -276,7 +332,7 @@ int main(int argc, char **argv)
     uv_connect_t* connect = malloc(sizeof(uv_connect_t));
 
     struct sockaddr_in dest;
-    uv_ip4_addr(broker_ip, 10973, &dest);
+    uv_ip4_addr(broker_ip, broker_port, &dest);
 
     uv_tcp_connect(connect, socket, (const struct sockaddr*)&dest, on_connect);
     uv_run(loop, UV_RUN_DEFAULT);
